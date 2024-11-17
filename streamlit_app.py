@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import hnswlib
 import openai
-import os
 import numpy as np
 from io import BytesIO
 import base64
@@ -11,12 +10,26 @@ import base64
 st.set_page_config(page_title="多重代理分析系統", layout="wide")
 
 # 設置 OpenAI API 金鑰
-# 建議將 API 金鑰存儲在環境變數中或 Streamlit 的 secrets 中
-# 這裡使用 Streamlit 的 secrets 功能
+# 嘗試從 secrets 中獲取，如果沒有，則允許用戶手動輸入
 if "openai_api_key" not in st.session_state:
-    st.session_state.openai_api_key = st.secrets["openai"]["api_key"]
+    if "openai" in st.secrets:
+        st.session_state.openai_api_key = st.secrets["openai"]["api_key"]
+    else:
+        st.session_state.openai_api_key = ""
 
-openai.api_key = st.session_state.openai_api_key
+if not st.session_state.openai_api_key:
+    st.sidebar.header("API 金鑰設置")
+    st.session_state.openai_api_key = st.sidebar.text_input(
+        "輸入您的 OpenAI API 金鑰",
+        type="password",
+        help="您可以將 API 金鑰添加到 Streamlit 的 secrets 中，或者在這裡手動輸入。"
+    )
+
+if not st.session_state.openai_api_key:
+    st.warning("請在側邊欄輸入您的 OpenAI API 金鑰以繼續。")
+    st.stop()
+else:
+    openai.api_key = st.session_state.openai_api_key
 
 # 初始化或載入 session state
 if 'documents' not in st.session_state:
@@ -132,18 +145,27 @@ uploaded_files = st.sidebar.file_uploader("選擇 CSV 文件（可多選）", ty
 
 if uploaded_files:
     for uploaded_file in uploaded_files:
-        df = pd.read_csv(uploaded_file)
-        st.sidebar.write(f"文件名：{uploaded_file.name}")
-        st.sidebar.dataframe(df.head())
-        # 將每行轉換為字符串
-        documents = df.apply(lambda row: row.to_string(index=False), axis=1).tolist()
-        st.session_state.documents.extend(documents)
+        try:
+            df = pd.read_csv(uploaded_file)
+            st.sidebar.write(f"文件名：{uploaded_file.name}")
+            st.sidebar.dataframe(df.head())
+            # 將每行轉換為字符串
+            documents = df.apply(lambda row: row.to_string(index=False), axis=1).tolist()
+            st.session_state.documents.extend(documents)
+        except Exception as e:
+            st.sidebar.error(f"無法讀取文件 {uploaded_file.name}：{e}")
     
     # 建立 hnswlib 索引
     if st.sidebar.button("建立索引"):
-        with st.spinner("正在建立索引..."):
-            st.session_state.index = build_hnsw_index(st.session_state.documents)
-        st.sidebar.success("索引建立完成！")
+        if st.session_state.documents:
+            with st.spinner("正在建立索引..."):
+                try:
+                    st.session_state.index = build_hnsw_index(st.session_state.documents)
+                    st.sidebar.success("索引建立完成！")
+                except Exception as e:
+                    st.sidebar.error(f"建立索引時出錯：{e}")
+        else:
+            st.sidebar.warning("沒有可用的文檔來建立索引。")
 
 # 提問區域
 st.header("提問並生成分析報告")
