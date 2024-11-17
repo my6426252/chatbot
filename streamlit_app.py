@@ -11,12 +11,12 @@ import base64
 st.set_page_config(page_title="多重代理分析系統", layout="wide")
 
 # 設置 OpenAI API 金鑰
-# 建議將 API 金鑰存儲在環境變數中
-openai_api_key = st.text_input("OpenAI API Key", type="password")
-if not openai_api_key:
-    st.warning("請輸入您的 OpenAI API 金鑰以繼續。")
-    st.stop()
-openai.api_key = openai_api_key
+# 建議將 API 金鑰存儲在環境變數中或 Streamlit 的 secrets 中
+# 這裡使用 Streamlit 的 secrets 功能
+if "openai_api_key" not in st.session_state:
+    st.session_state.openai_api_key = st.secrets["openai"]["api_key"]
+
+openai.api_key = st.session_state.openai_api_key
 
 # 初始化或載入 session state
 if 'documents' not in st.session_state:
@@ -43,16 +43,15 @@ class Agent:
         self.messages.append({"role": "user", "content": message})
 
     def retrieve_relevant_docs(self, query, top_k=5):
-        # 這裡簡化為使用隨機向量，實際應用中應使用嵌入模型
-        # 您可以使用 OpenAI 的嵌入模型來生成 query 向量
+        # 使用 OpenAI 的嵌入模型來生成 query 向量
         response = openai.Embedding.create(
             input=[query],
             model="text-embedding-ada-002"
         )
         query_vector = np.array(response['data'][0]['embedding']).astype('float32')
         query_vector = np.expand_dims(query_vector, axis=0)
-        labels, distances = st.session_state.index.knn_query(query_vector, k=top_k)
-        retrieved_docs = [st.session_state.documents[i] for i in labels[0]]
+        labels, distances = self.index.knn_query(query_vector, k=top_k)
+        retrieved_docs = [self.documents[i] for i in labels[0]]
         return retrieved_docs
 
     def get_response(self):
@@ -79,7 +78,7 @@ class Agent:
             return ""
 
 # 建立或更新 hnswlib 索引
-def build_hnsw_index(documents, dim=768, max_elements=10000):
+def build_hnsw_index(documents, dim=1536, max_elements=10000):
     p = hnswlib.Index(space='l2', dim=dim)
     p.init_index(max_elements=max_elements, ef_construction=200, M=16)
     
@@ -141,10 +140,10 @@ if uploaded_files:
         st.session_state.documents.extend(documents)
     
     # 建立 hnswlib 索引
-    if st.button("建立索引"):
+    if st.sidebar.button("建立索引"):
         with st.spinner("正在建立索引..."):
             st.session_state.index = build_hnsw_index(st.session_state.documents)
-        st.success("索引建立完成！")
+        st.sidebar.success("索引建立完成！")
 
 # 提問區域
 st.header("提問並生成分析報告")
@@ -183,9 +182,9 @@ else:
                     context = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.messages])
                     prompt = f"討論輪次 {round_num}，基於以下討論內容：\n{context}\n請提供您的回應。"
                     agent.add_message(prompt)
-                    response = agent.get_response()
-                    st.session_state.messages.append({"role": "assistant", "content": response})
-                    st.write(f"**{agent.name}**: {response}")
+                    reply = agent.get_response()
+                    st.session_state.messages.append({"role": "assistant", "content": reply})
+                    st.write(f"**{agent.name}**: {reply}")
             
             # 生成最終報告
             final_discussion = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.messages])
