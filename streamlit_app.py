@@ -83,7 +83,7 @@ class Agent:
                 n=1,
                 stop=None,
             )
-            reply = response.choices[0].message['content'].strip()
+            reply = response['choices'][0]['message']['content'].strip()
             self.messages.append({"role": "assistant", "content": reply})
             return reply
         except Exception as e:
