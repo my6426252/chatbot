@@ -1,10 +1,10 @@
 import streamlit as st
 import pandas as pd
 import hnswlib
-import openai
 import numpy as np
 from io import BytesIO
 import base64
+import openai
 
 # 設置頁面配置
 st.set_page_config(page_title="多重代理分析系統", layout="wide")
@@ -62,7 +62,6 @@ class Agent:
             model="text-embedding-ada-002"
         )
         query_vector = np.array(response['data'][0]['embedding']).astype('float32')
-        query_vector = np.expand_dims(query_vector, axis=0)
         labels, distances = self.index.knn_query(query_vector, k=top_k)
         retrieved_docs = [self.documents[i] for i in labels[0]]
         return retrieved_docs
@@ -163,9 +162,7 @@ if uploaded_files:
                     st.session_state.index = build_hnsw_index(st.session_state.documents)
                     st.sidebar.success("索引建立完成！")
                 except Exception as e:
-                    st.sidebar.error(f"建立索引時出錯：{e}")
-        else:
-            st.sidebar.warning("沒有可用的文檔來建立索引。")
+                    st.sidebar.error(f"建立索引
 
 # 提問區域
 st.header("提問並生成分析報告")
