@@ -5,6 +5,7 @@ import numpy as np
 from io import BytesIO
 import base64
 import openai
+from openai.embeddings_utils import get_embedding  # 新的嵌入工具模块
 
 # 設置頁面配置
 st.set_page_config(page_title="多重代理分析系統", layout="wide")
@@ -56,12 +57,9 @@ class Agent:
         self.messages.append({"role": "user", "content": message})
 
     def retrieve_relevant_docs(self, query, top_k=5):
-        # 使用 OpenAI 的嵌入模型來生成 query 向量
-        response = openai.Embedding.create(
-            input=[query],
-            model="text-embedding-ada-002"
-        )
-        query_vector = np.array(response['data'][0]['embedding']).astype('float32')
+        # 使用新的 openai.embeddings_utils.get_embedding 來生成 query 向量
+        query_vector = get_embedding(query, model="text-embedding-ada-002")
+        query_vector = np.array(query_vector).astype('float32')
         labels, distances = self.index.knn_query(query_vector, k=top_k)
         retrieved_docs = [self.documents[i] for i in labels[0]]
         return retrieved_docs
@@ -94,12 +92,9 @@ def build_hnsw_index(documents, dim=1536, max_elements=10000):
     p = hnswlib.Index(space='l2', dim=dim)
     p.init_index(max_elements=max_elements, ef_construction=200, M=16)
     
-    # 使用 OpenAI 的嵌入模型來生成向量
-    response = openai.Embedding.create(
-        input=documents,
-        model="text-embedding-ada-002"
-    )
-    vectors = np.array([record['embedding'] for record in response['data']]).astype('float32')
+    # 使用新的 get_embedding 來生成向量
+    embeddings = [get_embedding(doc, model="text-embedding-ada-002") for doc in documents]
+    vectors = np.array(embeddings).astype('float32')
     labels = np.arange(len(documents))
     
     p.add_items(vectors, labels)
