@@ -154,15 +154,16 @@ if uploaded_files:
         except Exception as e:
             st.sidebar.error(f"無法讀取文件 {uploaded_file.name}：{e}")
     
-    # 建立 hnswlib 索引
-    if st.sidebar.button("建立索引"):
-        if st.session_state.documents:
-            with st.spinner("正在建立索引..."):
-                try:
-                    st.session_state.index = build_hnsw_index(st.session_state.documents)
-                    st.sidebar.success("索引建立完成！")
-                except Exception as e:
-                    st.sidebar.error(f"建立索引
+if st.sidebar.button("建立索引"):
+    if st.session_state.documents:
+        with st.spinner("正在建立索引..."):
+            try:
+                st.session_state.index = build_hnsw_index(st.session_state.documents)
+                st.sidebar.success("索引建立完成！")
+            except Exception as e:
+                st.sidebar.error(f"建立索引時出錯：{e}")
+    else:
+        st.sidebar.warning("沒有可用的文檔來建立索引。")
 
 # 提問區域
 st.header("提問並生成分析報告")
